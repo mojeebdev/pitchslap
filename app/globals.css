@@ -1,0 +1,209 @@
+@import "tailwindcss";
+
+:root {
+  --font-display: var(--font-eb-garamond);
+  --font-mono: var(--font-dm-mono);
+
+  /* Brand colors */
+  --bg: #0A0908;
+  --bg-elev: #0d0b0a;
+  --text: #f0ebe4;
+  --text-muted: #a8a29e;
+  --border: #2a2520;
+  --red: #ff3434;
+  --red-hover: #ff5555;
+  --green: #34ff8a;
+  --overlay: rgba(10, 9, 8, 0.72);
+}
+
+body {
+  font-family: var(--font-mono);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Typography helpers */
+.font-display {
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-feature-settings: "tnum" on, "lnum" on;
+}
+
+.font-mono {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Hero background with responsive images */
+.hero-bg {
+  background-image: url('/images/hero-bg-desktop.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+@media (max-width: 768px) {
+  .hero-bg {
+    background-image: url('/images/hero-bg-mobile.png');
+  }
+}
+
+/* Dark overlay for readability */
+.hero-overlay {
+  background-color: var(--overlay);
+}
+
+/* Logo */
+.logo-ps {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  color: var(--red);
+  letter-spacing: -0.02em;
+}
+
+/* Product name */
+.product-name {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 700;
+  color: #f5f0e9;
+  letter-spacing: -0.01em;
+  line-height: 0.95;
+}
+
+/* Section labels */
+.section-label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+/* Input */
+.pitch-textarea {
+  font-family: var(--font-mono);
+  background-color: var(--bg-elev);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.7;
+  resize: vertical;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.pitch-textarea:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 0 1px rgba(255, 52, 52, 0.15);
+}
+
+.pitch-textarea::placeholder {
+  color: #6b665f;
+}
+
+/* CTA Button */
+.slap-button {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background-color: var(--red);
+  color: var(--bg);
+  transition: background-color 150ms ease, transform 100ms ease;
+}
+
+.slap-button:hover:not(:disabled) {
+  background-color: var(--red-hover);
+}
+
+.slap-button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.slap-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Output cards */
+.roast-card {
+  border-left: 3px solid var(--red);
+  background-color: rgba(255, 52, 52, 0.05);
+  border-radius: 2px;
+}
+
+.fix-card {
+  border-left: 3px solid var(--green);
+  background-color: rgba(52, 255, 138, 0.05);
+  border-radius: 2px;
+}
+
+/* AI output text */
+.ai-output {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+/* Fix bullets */
+.fix-bullet {
+  position: relative;
+  padding-left: 1.35rem;
+}
+
+.fix-bullet::before {
+  content: "→";
+  position: absolute;
+  left: 0;
+  color: var(--green);
+  font-weight: 600;
+}
+
+/* Share button */
+.share-button {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border: 1px solid #3f3830;
+  color: var(--text-muted);
+  transition: all 150ms ease;
+}
+
+.share-button:hover {
+  border-color: var(--text);
+  color: var(--text);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+/* Loading */
+.loading-dots::after {
+  content: "";
+  animation: dots 1.2s infinite steps(3);
+}
+
+@keyframes dots {
+  0% { content: ""; }
+  25% { content: "."; }
+  50% { content: ".."; }
+  75% { content: "..."; }
+}
+
+/* Subtle divider */
+.divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent, #2a2520, transparent);
+}
+
+/* Responsive tweaks */
+@media (max-width: 640px) {
+  .product-name {
+    font-size: 2.75rem !important;
+  }
+  
+  .ai-output {
+    font-size: 13.5px;
+  }
+}
