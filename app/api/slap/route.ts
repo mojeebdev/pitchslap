@@ -220,25 +220,39 @@ export async function POST(req: NextRequest) {
       throw new Error('Empty response from model');
     }
 
-    // Clean possible markdown fences or extra text
+    // Extract potential JSON object
     let jsonStr = content;
-    const fenceMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (fenceMatch) {
-      jsonStr = fenceMatch[1].trim();
-    }
-
-    // Sometimes models add leading text; try to extract the first {...}
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       jsonStr = jsonMatch[0];
     }
 
     let parsed: { roast?: string; fix?: string[] };
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
+
+    const tryParse = (str: string) => {
+      try {
+        return JSON.parse(str);
+      } catch {
+        return null;
+      }
+    };
+
+    // First attempt: direct parse
+    parsed = tryParse(jsonStr);
+
+    // Second attempt: repair common LLM JSON mistakes (unquoted keys, single quotes, trailing commas)
+    if (!parsed) {
+      let repaired = jsonStr
+        .replace(/'/g, '"')                                    // single → double quotes
+        .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')   // unquoted keys
+        .replace(/,\s*([}\]])/g, '$1');                        // trailing commas
+
+      parsed = tryParse(repaired);
+    }
+
+    if (!parsed) {
       console.error('Failed to parse model JSON:', content);
-      // Fallback: treat whole as roast, no fixes
+      // Fallback
       return NextResponse.json<SlapResponse>({
         roast: content.slice(0, 600),
         fix: [
