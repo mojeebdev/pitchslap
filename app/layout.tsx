@@ -17,7 +17,7 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://pitchslap.vercel.app"),
+  metadataBase: new URL("https://pitchslap.mojeeb.xyz"),
   title: "PitchSlap",
   description: "Paste your startup idea. Get brutally honest feedback from an AI seed-stage VC. No sugarcoating — just the roast and the fix.",
   icons: [

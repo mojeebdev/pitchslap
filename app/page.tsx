@@ -103,7 +103,7 @@ export default function PitchSlap() {
     if (!result) return;
 
     const first = getFirstSentence(result.roast);
-    const tweetText = `Just got my pitch slapped. ${first} — fixed it with PitchSlap https://pitchslap.vercel.app`;
+    const tweetText = `Just got my pitch slapped. ${first} — fixed it with PitchSlap https://pitchslap.mojeeb.xyz`;
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
@@ -262,7 +262,7 @@ export default function PitchSlap() {
 
           {/* Tiny legal-ish note */}
           <p className="mt-8 text-[10px] text-[#56514a] font-mono tracking-[0.1em]">
-            3 REQUESTS PER MINUTE PER IP • NO DATA STORED
+            5 REQUESTS PER 5 MINUTES • NO DATA STORED
           </p>
         </div>
 

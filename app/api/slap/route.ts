@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Using the original reliable free model (Meta Llama 3.3 70B)
-// Gemini 2.5 Flash Lite free variants on OpenRouter have been unstable/deprecated recently
-const MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+// Using OpenRouter's dynamic free router.
+// This automatically selects from currently available free models,
+// which is the most reliable way to use free tier without hardcoding unstable models.
+const MODEL = 'openrouter/free';
 
 const SYSTEM_PROMPT = `You are a brutally honest seed-stage venture capitalist who has seen 10,000 pitches. You do not use motivational language. When you receive a startup idea, respond ONLY in this JSON format: { roast: '3-4 sentence brutal critique', fix: ['actionable fix 1', 'actionable fix 2', 'actionable fix 3'] }. Be specific, not generic. No JSON markdown fences. Raw JSON only.`;
 
 // In-memory rate limiter: IP -> array of request timestamps (sliding window)
 const rateLimitMap = new Map<string, number[]>();
 
-const MAX_REQUESTS_PER_MINUTE = 3;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 5;
+const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 
 function getClientIp(req: NextRequest): string {
   // Vercel / proxies
@@ -35,7 +36,7 @@ function checkRateLimit(ip: string): { limited: boolean; retryAfter?: number } {
   // Remove timestamps outside the current window
   timestamps = timestamps.filter((ts) => now - ts < RATE_LIMIT_WINDOW_MS);
 
-  if (timestamps.length >= MAX_REQUESTS_PER_MINUTE) {
+  if (timestamps.length >= MAX_REQUESTS_PER_WINDOW) {
     // Calculate seconds until the oldest request expires from the window
     const oldest = timestamps[0];
     const retryAfter = Math.max(1, Math.ceil((oldest + RATE_LIMIT_WINDOW_MS - now) / 1000));
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json<ErrorResponse>(
       {
         error: 'rate_limited',
-        message: '3 requests per minute. Please wait before submitting again.',
+        message: '5 requests per 5 minutes to save free tier tokens. Please wait before submitting again.',
         retryAfter: rateCheck.retryAfter,
       },
       { status: 429 }
@@ -154,7 +155,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://pitchslap.vercel.app',
+        'HTTP-Referer': 'https://pitchslap.mojeeb.xyz',
         'X-Title': 'PitchSlap',
       },
       body: JSON.stringify(requestBody),
@@ -209,6 +210,11 @@ export async function POST(req: NextRequest) {
 
     const data = await orRes.json();
     const content: string = data?.choices?.[0]?.message?.content?.trim() || '';
+
+    // Log which actual model was used (very useful when using openrouter/free)
+    if (data?.model) {
+      console.log(`[Success] Routed to model: ${data.model}`);
+    }
 
     if (!content) {
       throw new Error('Empty response from model');
