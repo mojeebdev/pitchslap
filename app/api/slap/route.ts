@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Using OpenRouter's dynamic free router.
-// This automatically selects from currently available free models,
-// which is the most reliable way to use free tier without hardcoding unstable models.
-const MODEL = 'openrouter/free';
+// Primary: dynamic free router for maximum availability
+const PRIMARY_MODEL = 'openrouter/free';
+
+// Fallback: stronger, more reliable model when the free router returns garbage JSON
+const FALLBACK_MODEL = 'qwen/qwen-2.5-72b-instruct:free';
 
 const SYSTEM_PROMPT = `You are a brutally honest seed-stage venture capitalist who has seen 10,000 pitches. You do not use motivational language. When you receive a startup idea, respond ONLY in this JSON format: { roast: '3-4 sentence brutal critique', fix: ['actionable fix 1', 'actionable fix 2', 'actionable fix 3'] }. Be specific, not generic. No JSON markdown fences. Raw JSON only.`;
 
@@ -134,9 +135,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  try {
+  async function callModel(model: string, idea: string) {
     const requestBody: any = {
-      model: MODEL,
+      model,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: idea },
@@ -145,8 +146,7 @@ export async function POST(req: NextRequest) {
       max_tokens: 800,
     };
 
-    // Only send reasoning parameter for Gemini models (Llama and others often reject unsupported fields)
-    if (MODEL.includes('gemini')) {
+    if (model.includes('gemini')) {
       requestBody.reasoning = { effort: "minimal" };
     }
 
@@ -163,104 +163,45 @@ export async function POST(req: NextRequest) {
 
     if (!orRes.ok) {
       const errText = await orRes.text().catch(() => '');
-
-      // Rich logging for debugging upstream issues
       console.error('=== OpenRouter Upstream Error ===');
       console.error('Status:', orRes.status);
       console.error('Raw response:', errText);
       console.error('=================================');
-
-      let userMessage = 'The roast engine is having a moment. Try again in a minute.';
-      let retryAfter: number | undefined;
-
-      try {
-        const parsed = JSON.parse(errText);
-        const meta = parsed?.error?.metadata;
-        const msg = parsed?.error?.message || '';
-
-        console.log('[Debug] Parsed OpenRouter error:', parsed);
-
-        if (orRes.status === 429 || parsed?.error?.code === 429) {
-          const wait = meta?.retry_after_seconds ?? meta?.retry_after_seconds_raw;
-          retryAfter = wait ? Math.ceil(Number(wait)) : 30;
-          userMessage = `The free model is temporarily rate-limited. Please wait ~${retryAfter}s and try again.`;
-          console.log('[Debug] Decided: Rate limited, retryAfter =', retryAfter);
-        } else if (orRes.status === 404 || msg.toLowerCase().includes('no endpoints found')) {
-          userMessage = 'This model is currently unavailable on the free tier. We are switching to a backup.';
-          console.log('[Debug] Decided: Model not available (404 / no endpoints)');
-        } else if (meta?.provider_name) {
-          userMessage = `The model provider (${meta.provider_name}) is having issues. Try again shortly.`;
-          console.log('[Debug] Decided: Provider issue →', meta.provider_name);
-        } else {
-          console.log('[Debug] Decided: Generic fallback');
-        }
-      } catch (parseErr) {
-        console.error('[Debug] Failed to parse OpenRouter error body:', parseErr);
-      }
-
-      return NextResponse.json<ErrorResponse>(
-        {
-          error: 'upstream_error',
-          message: userMessage,
-          retryAfter,
-        },
-        { status: 502 }
-      );
+      return null;
     }
 
     const data = await orRes.json();
     const content: string = data?.choices?.[0]?.message?.content?.trim() || '';
 
-    // Log which actual model was used (very useful when using openrouter/free)
     if (data?.model) {
       console.log(`[Success] Routed to model: ${data.model}`);
     }
 
-    if (!content) {
-      throw new Error('Empty response from model');
-    }
+    if (!content) return null;
 
-    // Extract potential JSON object
+    // Extract JSON
     let jsonStr = content;
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[0];
-    }
-
-    let parsed: { roast?: string; fix?: string[] };
+    if (jsonMatch) jsonStr = jsonMatch[0];
 
     const tryParse = (str: string) => {
-      try {
-        return JSON.parse(str);
-      } catch {
-        return null;
-      }
+      try { return JSON.parse(str); } catch { return null; }
     };
 
-    // First attempt: direct parse
-    parsed = tryParse(jsonStr);
+    let parsed = tryParse(jsonStr);
 
-    // Second attempt: repair common LLM JSON mistakes (unquoted keys, single quotes, trailing commas)
+    // Repair attempt
     if (!parsed) {
-      let repaired = jsonStr
-        .replace(/'/g, '"')                                    // single → double quotes
-        .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')   // unquoted keys
-        .replace(/,\s*([}\]])/g, '$1');                        // trailing commas
-
+      const repaired = jsonStr
+        .replace(/'/g, '"')
+        .replace(/([{,]\s*)([a-zA-Z0-9_]+)\s*:/g, '$1"$2":')
+        .replace(/,\s*([}\]])/g, '$1');
       parsed = tryParse(repaired);
     }
 
     if (!parsed) {
       console.error('Failed to parse model JSON:', content);
-      // Fallback
-      return NextResponse.json<SlapResponse>({
-        roast: content.slice(0, 600),
-        fix: [
-          'Clarify the core problem you are solving in one sentence.',
-          'Define your target customer and how you reach them.',
-          'Show traction or a clear next experiment before asking for money.',
-        ],
-      });
+      return null;
     }
 
     const roast = (parsed.roast || '').trim();
@@ -268,11 +209,39 @@ export async function POST(req: NextRequest) {
       ? parsed.fix.map((f: string) => f.trim()).filter(Boolean).slice(0, 3)
       : [];
 
-    if (!roast || fix.length === 0) {
-      throw new Error('Malformed JSON from model');
+    if (!roast || fix.length === 0) return null;
+
+    return { roast, fix };
+  }
+
+  try {
+    // First attempt with the dynamic free router
+    let result = await callModel(PRIMARY_MODEL, idea);
+    let usedFallback = false;
+
+    // Fallback to Qwen 2.5 72B if primary gave bad output
+    if (!result) {
+      console.log('⚠️  [Fallback] openrouter/free failed to produce valid JSON. Retrying with qwen/qwen-2.5-72b-instruct:free...');
+      usedFallback = true;
+      result = await callModel(FALLBACK_MODEL, idea);
     }
 
-    return NextResponse.json<SlapResponse>({ roast, fix });
+    if (result) {
+      if (usedFallback) {
+        console.log('✅ [Fallback Success] Used Qwen 2.5 72B as backup model');
+      }
+      return NextResponse.json<SlapResponse>(result);
+    }
+
+    // Final generic fallback
+    return NextResponse.json<SlapResponse>({
+      roast: "We couldn't generate a structured roast for this idea.",
+      fix: [
+        'Clarify the core problem you are solving in one sentence.',
+        'Define your target customer and how you reach them.',
+        'Show traction or a clear next experiment before asking for money.',
+      ],
+    });
   } catch (err) {
     console.error('Slap API error:', err);
     return NextResponse.json<ErrorResponse>(
