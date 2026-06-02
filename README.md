@@ -2,7 +2,7 @@
 
 Brutally honest AI-powered pitch feedback for founders. Paste your startup idea (2–5 sentences) and get a no-sugarcoating roast + 3 actionable fixes from a simulated seed-stage VC.
 
-**Live demo:** https://pitchslap.mojeeb.xyz (when deployed)
+**Live demo:** https://pitchslap.mojeeb.xyz 
 
 ## How it works
 
