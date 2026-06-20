@@ -50,4 +50,4 @@ The app is ready for serverless (no persistent state required).
 - Multiple model fallbacks
 - Custom logo / favicon
 
-Built for the 30 Days of Vibeathons challenge by [@mojeebeth](https://x.com/mojeebeth) — [mojeeb.xyz](https://mojeeb.xyz)
+Built for the 30 Days of Vibeathons challenge by [@tmojeeb](https://x.com/tmojeeb) — [mojeeb.xyz](https://mojeeb.xyz)
